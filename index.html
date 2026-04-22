@@ -22,7 +22,7 @@
             margin: 0;
         }
         .card { 
-            background: grey; 
+            background: white; 
             padding: 2rem; 
             border-radius: 16px; 
             box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
@@ -60,6 +60,12 @@
         #result-label { font-size: 0.8rem; color: #8d949e; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
         #result-value { font-size: 2.2rem; font-weight: 800; color: #007aff; }
 
+        /* World Record Display */
+        #record-container { margin-top: 12px; font-size: 0.85rem; color: #606770; display: none; }
+        #record-container a { color: #1877f2; text-decoration: none; }
+        #record-container a:hover { text-decoration: underline; }
+        #record-text { line-height: 1.6; }
+
         /* Splits Table */
         #splits-container { margin-top: 20px; width: 100%; border-collapse: collapse; font-size: 0.9rem; }
         #splits-container th { text-align: left; color: #8d949e; border-bottom: 1px solid #eee; padding: 8px; }
@@ -78,10 +84,10 @@
 
         <label>Race Distance</label>
         <div class="preset-grid">
-            <button class="preset-btn" onclick="setDist(3.11)">5K</button>
-            <button class="preset-btn" onclick="setDist(6.21)">10K</button>
-            <button class="preset-btn" onclick="setDist(13.11)">Half-Marathon (13.1 mi)</button>
-            <button class="preset-btn" onclick="setDist(26.22)">Marathon (26.2 mi)</button>
+            <button class="preset-btn" onclick="setDist(3.1)">5K</button>
+            <button class="preset-btn" onclick="setDist(6.2)">10K</button>
+            <button class="preset-btn" onclick="setDist(13.1)">Half-Marathon (13.1 mi)</button>
+            <button class="preset-btn" onclick="setDist(26.2)">Marathon (26.2 mi)</button>
         </div>
         <div class="input-group">
             <input type="number" id="dist" placeholder="0.00" step="0.01">
@@ -96,7 +102,7 @@
                     <span class="unit">min</span>
                 </div>
                 <div class="input-group">
-                    <input type="number" id="pace-sec" placeholder="00" max="59">
+                    <input type="number" id="pace-sec" placeholder="00" min="0" max="59">
                     <span class="unit">sec</span>
                 </div>
             </div>
@@ -114,7 +120,7 @@
                     <span class="unit">min</span>
                 </div>
                 <div class="input-group">
-                    <input type="number" id="goal-sec" placeholder="0">
+                    <input type="number" id="goal-sec" placeholder="0" min="0" max="59">
                     <span class="unit">sec</span>
                 </div>
             </div>
@@ -129,6 +135,12 @@
         <div id="result-container">
             <div id="result-label">Result</div>
             <div id="result-value">--:--:--</div>
+
+            <!-- World record display — only shown in Predict Time mode for standard distances -->
+            <div id="record-container">
+                <div id="record-text"></div>
+            </div>
+
             <table id="splits-container" class="hidden">
                 <thead><tr><th>Mile</th><th>Total Elapsed</th></tr></thead>
                 <tbody id="splits-body"></tbody>
@@ -138,6 +150,31 @@
 
     <script>
         let currentMode = 'time';
+
+        // World records for standard distances (keyed by miles)
+        // Last updated: April 2026 https://worldathletics.org/records/by-discipline/road-running
+        const worldRecords = {
+            3.1: {
+                men:   { time: "12:49", name: "Berihu Aregawi",     url: "https://worldathletics.org/athletes/ethiopia/berihu-aregawi-14848753" },
+                women: { time: "13:54", name: "Beatrice Chebet",     url: "https://worldathletics.org/athletes/kenya/beatrice-chebet-14749924" },
+                label: "5K"
+            },
+            6.2: {
+                men:   { time: "26:24", name: "Rhonex Kipruto",      url: "https://worldathletics.org/athletes/kenya/rhonex-kipruto-14709057" },
+                women: { time: "28:46", name: "Agnes Jebet Ngetich", url: "https://worldathletics.org/athletes/kenya/agnes-jebet-ngetich-14758189" },
+                label: "10K"
+            },
+            13.1: {
+                men:   { time: "57:20",   name: "Jacob Kiplimo",    url: "https://worldathletics.org/athletes/uganda/jacob-kiplimo-14735365" },
+                women: { time: "1:02:52", name: "Letesenbet Gidey", url: "https://worldathletics.org/athletes/ethiopia/letesenbet-gidey-14654918" },
+                label: "Half Marathon"
+            },
+            26.2: {
+                men:   { time: "2:00:35", name: "Kelvin Kiptum",    url: "https://worldathletics.org/athletes/kenya/kelvin-kiptum-14859609" },
+                women: { time: "2:09:56", name: "Ruth Chepngetich", url: "https://worldathletics.org/athletes/kenya/ruth-chepngetich-14766298" },
+                label: "Marathon"
+            }
+        };
 
         function setMode(mode) {
             currentMode = mode;
@@ -151,14 +188,23 @@
         function setDist(val) { document.getElementById('dist').value = val; resetUI(); }
         
         function resetUI() { 
-            document.getElementById('result-label').innerText = "Result";
-            document.getElementById('result-value').innerText = "--:--:--"; 
+            document.getElementById('result-label').textContent = "Result";
+            document.getElementById('result-value').textContent = "--:--:--";
+            document.getElementById('record-container').style.display = 'none';
             document.getElementById('splits-container').classList.add('hidden');
         }
 
         function calculate() {
-            const dist = parseFloat(document.getElementById('dist').value);
-            if (!dist || dist <= 0) return alert("Please enter a distance.");
+            // 1. Get the RAW string from the input first
+            const rawInput = document.getElementById('dist').value;
+            
+            // 2. Convert it to a number for math
+            const dist = parseFloat(rawInput);
+
+            // 3. Check the raw string for emptiness OR the number for 0/NaN
+            if (rawInput === "" || isNaN(dist) || dist <= 0) {
+                return alert("Please enter a distance.");
+            }
 
             let paceInSeconds = 0;
             let totalSeconds = 0;
@@ -166,23 +212,43 @@
             if (currentMode === 'time') {
                 const min = parseInt(document.getElementById('pace-min').value) || 0;
                 const sec = parseInt(document.getElementById('pace-sec').value) || 0;
+                if (sec < 0 || sec > 59) return alert("Seconds must be between 0 and 59.");
                 paceInSeconds = (min * 60) + sec;
                 totalSeconds = dist * paceInSeconds;
-                
-                document.getElementById('result-label').innerText = "Predicted Finish Time";
-                document.getElementById('result-value').innerText = formatTime(totalSeconds);
+
+                document.getElementById('result-label').textContent = "Predicted Finish Time";
+                document.getElementById('result-value').textContent = formatTime(totalSeconds);
+                showRecord(dist);
             } else {
                 const hr = parseInt(document.getElementById('goal-hr').value) || 0;
                 const min = parseInt(document.getElementById('goal-min').value) || 0;
                 const sec = parseInt(document.getElementById('goal-sec').value) || 0;
+                if (sec < 0 || sec > 59) return alert("Seconds must be between 0 and 59.");
                 totalSeconds = (hr * 3600) + (min * 60) + sec;
-                paceInSeconds = totalSeconds / dist;
                 
-                document.getElementById('result-label').innerText = "Required Pace Per Mile";
-                document.getElementById('result-value').innerText = formatTime(paceInSeconds) + " /mi";
+                // Now that we know 'dist' is not 0, this division is safe
+                paceInSeconds = totalSeconds / dist;
+
+                document.getElementById('result-label').textContent = "Required Pace Per Mile";
+                document.getElementById('result-value').textContent = formatTime(paceInSeconds) + " /mi";
             }
 
             renderSplits(dist, paceInSeconds, totalSeconds);
+        }
+
+        function showRecord(dist) {
+            const container = document.getElementById('record-container');
+            const record = worldRecords[dist];
+            if (!record) {
+                container.style.display = 'none';
+                return;
+            }
+            const menLink = `<a href="${record.men.url}" target="_blank" rel="noopener">${record.men.name}</a>`;
+            const womenLink = `<a href="${record.women.url}" target="_blank" rel="noopener">${record.women.name}</a>`;
+            document.getElementById('record-text').innerHTML =
+                `🏆 <strong>${record.label} World Records</strong><br>
+                 Men: ${record.men.time} ${menLink} &nbsp;|&nbsp; Women: ${record.women.time} ${womenLink}`;
+            container.style.display = 'block';
         }
 
         function renderSplits(dist, paceInSec, totalSec) {
@@ -194,8 +260,12 @@
                 for (let i = 1; i <= Math.floor(dist); i++) {
                     body.innerHTML += `<tr><td>Mile ${i}</td><td>${formatTime(i * paceInSec)}</td></tr>`;
                 }
-                if (dist % 1 !== 0) {
-                    body.innerHTML += `<tr class="last-row"><td>Finish (${dist})</td><td>${formatTime(totalSec)}</td></tr>`;
+                const isExactMile = dist % 1 === 0;
+                if (!isExactMile) {
+                    body.innerHTML += `<tr class="last-row"><td>Finish (${dist} mi)</td><td>${formatTime(totalSec)}</td></tr>`;
+                } else {
+                    const lastRow = body.querySelector('tr:last-child');
+                    if (lastRow) lastRow.classList.add('last-row');
                 }
             } else {
                 container.classList.add('hidden');
@@ -211,6 +281,10 @@
             const ss = s.toString().padStart(2, '0');
             return `${hh}${mm}${ss}`;
         }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') calculate();
+        });
     </script>
 </body>
 </html>
