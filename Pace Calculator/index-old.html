@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pace Pro - Race Calculator</title>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pace Pro">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            padding: 20px; 
+            background: #f0f2f5; 
+            color: #1c1e21; 
+            margin: 0;
+        }
+        .card { 
+            background: white; 
+            padding: 2rem; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            max-width: 480px; 
+            width: 100%; 
+        }
+        h2 { margin-top: 0; text-align: center; margin-bottom: 20px; color: #007aff; }
+        
+        /* Mode Toggle */
+        .mode-selector { display: flex; background: #eee; border-radius: 8px; padding: 4px; margin-bottom: 20px; }
+        .mode-btn { flex: 1; padding: 10px; border: none; border-radius: 6px; cursor: pointer; background: transparent; font-weight: 600; transition: 0.2s; }
+        .mode-btn.active { background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #007aff; }
+
+        label { display: block; margin-top: 15px; font-size: 0.85rem; color: #606770; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        /* Input Groups with Inline Units */
+        .input-group { display: flex; align-items: center; gap: 8px; margin: 8px 0; width: 100%; }
+        input[type="number"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; -moz-appearance: textfield; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        .unit { font-size: 0.9rem; color: #8d949e; font-weight: 600; white-space: nowrap; width: 45px; }
+
+        /* Presets */
+        .preset-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
+        .preset-btn { padding: 10px; background: #e7f3ff; color: #1877f2; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 600; }
+        .preset-btn:hover { background: #dbeafe; }
+
+        .checkbox-container { display: flex; align-items: center; margin-top: 20px; gap: 8px; font-size: 0.9rem; color: #606770; cursor: pointer; }
+        .hidden { display: none; }
+
+        .calc-btn { width: 100%; padding: 16px; background: #007aff; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1.1rem; font-weight: 700; margin-top: 25px; }
+        
+        /* Result Display */
+        #result-container { margin-top: 25px; padding: 20px; border-radius: 12px; background: #f8f9fa; text-align: center; border: 2px solid #e7f3ff; }
+        #result-label { font-size: 0.8rem; color: #8d949e; text-transform: uppercase; margin-bottom: 5px; font-weight: 600; }
+        #result-value { font-size: 2.2rem; font-weight: 800; color: #007aff; }
+
+        /* Splits Table */
+        #splits-container { margin-top: 20px; width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        #splits-container th { text-align: left; color: #8d949e; border-bottom: 1px solid #eee; padding: 8px; }
+        #splits-container td { padding: 8px; border-bottom: 1px solid #f9f9f9; }
+        .last-row { font-weight: bold; color: #007aff; background: #e7f3ff; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Pace Pro</h2>
+        
+        <div class="mode-selector">
+            <button id="btn-time" class="mode-btn active" onclick="setMode('time')">Predict Time</button>
+            <button id="btn-pace" class="mode-btn" onclick="setMode('goal')">Target Pace</button>
+        </div>
+
+        <label>Race Distance</label>
+        <div class="preset-grid">
+            <button class="preset-btn" onclick="setDist(3.1)">5K</button>
+            <button class="preset-btn" onclick="setDist(6.2)">10K</button>
+            <button class="preset-btn" onclick="setDist(13.1)">Half-Marathon (13.1 mi)</button>
+            <button class="preset-btn" onclick="setDist(26.2)">Marathon (26.2 mi)</button>
+        </div>
+        <div class="input-group">
+            <input type="number" id="dist" placeholder="0.00" step="0.01">
+            <span class="unit">miles</span>
+        </div>
+
+        <div id="pace-fields">
+            <label>Goal Pace</label>
+            <div style="display: flex; gap: 10px;">
+                <div class="input-group">
+                    <input type="number" id="pace-min" placeholder="0">
+                    <span class="unit">min</span>
+                </div>
+                <div class="input-group">
+                    <input type="number" id="pace-sec" placeholder="00" min="0" max="59">
+                    <span class="unit">sec</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="goal-fields" class="hidden">
+            <label>Goal Finish Time</label>
+            <div style="display: flex; gap: 5px;">
+                <div class="input-group">
+                    <input type="number" id="goal-hr" placeholder="0">
+                    <span class="unit">hr</span>
+                </div>
+                <div class="input-group">
+                    <input type="number" id="goal-min" placeholder="0">
+                    <span class="unit">min</span>
+                </div>
+                <div class="input-group">
+                    <input type="number" id="goal-sec" placeholder="0" min="0" max="59">
+                    <span class="unit">sec</span>
+                </div>
+            </div>
+        </div>
+
+        <label class="checkbox-container">
+            <input type="checkbox" id="show-splits"> Show mile-by-mile splits
+        </label>
+        
+        <button class="calc-btn" onclick="calculate()">Calculate</button>
+
+        <div id="result-container">
+            <div id="result-label">Result</div>
+            <div id="result-value">--:--:--</div>
+            <table id="splits-container" class="hidden">
+                <thead><tr><th>Mile</th><th>Total Elapsed</th></tr></thead>
+                <tbody id="splits-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'time';
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('btn-time').classList.toggle('active', mode === 'time');
+            document.getElementById('btn-pace').classList.toggle('active', mode === 'goal');
+            document.getElementById('pace-fields').classList.toggle('hidden', mode === 'goal');
+            document.getElementById('goal-fields').classList.toggle('hidden', mode === 'time');
+            resetUI();
+        }
+
+        function setDist(val) { document.getElementById('dist').value = val; resetUI(); }
+        
+        function resetUI() { 
+            document.getElementById('result-label').innerText = "Result";
+            document.getElementById('result-value').innerText = "--:--:--"; 
+            document.getElementById('splits-container').classList.add('hidden');
+        }
+
+        function calculate() {
+            const dist = parseFloat(document.getElementById('dist').value);
+            if (!dist || dist <= 0) return alert("Please enter a distance.");
+
+            let paceInSeconds = 0;
+            let totalSeconds = 0;
+
+            if (currentMode === 'time') {
+                const min = parseInt(document.getElementById('pace-min').value) || 0;
+                const sec = parseInt(document.getElementById('pace-sec').value) || 0;
+                if (sec < 0 ||sec > 59) return alert("Seconds must be between 0 and 59.");
+		paceInSeconds = (min * 60) + sec;
+                totalSeconds = dist * paceInSeconds;
+                
+                document.getElementById('result-label').innerText = "Predicted Finish Time";
+                document.getElementById('result-value').innerText = formatTime(totalSeconds);
+            } else {
+                const hr = parseInt(document.getElementById('goal-hr').value) || 0;
+                const min = parseInt(document.getElementById('goal-min').value) || 0;
+                const sec = parseInt(document.getElementById('goal-sec').value) || 0;
+		if (sec < 0 ||sec > 59) return alert("Seconds must be between 0 and 59.");
+                totalSeconds = (hr * 3600) + (min * 60) + sec;
+                paceInSeconds = totalSeconds / dist;
+                
+                document.getElementById('result-label').innerText = "Required Pace Per Mile";
+                document.getElementById('result-value').innerText = formatTime(paceInSeconds) + " /mi";
+            }
+
+            renderSplits(dist, paceInSeconds, totalSeconds);
+        }
+
+        function renderSplits(dist, paceInSec, totalSec) {
+            const container = document.getElementById('splits-container');
+            const body = document.getElementById('splits-body');
+            if (document.getElementById('show-splits').checked) {
+                container.classList.remove('hidden');
+                body.innerHTML = "";
+                for (let i = 1; i <= Math.floor(dist); i++) {
+                    body.innerHTML += `<tr><td>Mile ${i}</td><td>${formatTime(i * paceInSec)}</td></tr>`;
+                }
+		const isExactMile = dist % 1 === 0;
+                if (!isExactMile) {
+                    body.innerHTML += `<tr class="last-row"><td>Finish (${dist})</td><td>${formatTime(totalSec)}</td></tr>`;
+		}else{
+		   const lastRow = body.querySelector('tr:last-child');
+		   if (lastRow) lastRow.classList.add('last-row');
+                }
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
+        function formatTime(totalSeconds) {
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = Math.round(totalSeconds % 60);
+            const hh = h > 0 ? h + ":" : "";
+            const mm = (h > 0 ? m.toString().padStart(2, '0') : m) + ":";
+            const ss = s.toString().padStart(2, '0');
+            return `${hh}${mm}${ss}`;
+        }
+    </script>
+</body>
+</html>
